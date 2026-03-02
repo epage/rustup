@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 
-use anyhow::{Result, format_err};
+use anyhow::Result;
 use clap::Parser;
 use tracing::warn;
 use tracing_subscriber::{EnvFilter, Registry, reload::Handle};
 
 use crate::{
     cli::{
-        common::{self, update_console_filter},
+        common::{self, report_cli_error, update_console_filter},
         self_update::{self, InstallOpts},
     },
     config::Cfg,
@@ -81,8 +81,6 @@ pub async fn main(
     process: &Process,
     console_filter: Handle<EnvFilter, Registry>,
 ) -> Result<utils::ExitCode> {
-    use clap::error::ErrorKind;
-
     let RustupInit {
         verbose,
         quiet,
@@ -98,12 +96,10 @@ pub async fn main(
         dump_testament,
     } = match RustupInit::try_parse() {
         Ok(args) => args,
-        Err(e) if [ErrorKind::DisplayHelp, ErrorKind::DisplayVersion].contains(&e.kind()) => {
-            use std::io::Write as _;
-            write!(process.stdout().lock(), "{}", e.render().ansi())?;
-            return Ok(utils::ExitCode::SUCCESS);
+        Err(err) => {
+            let code = report_cli_error(&err, process)?;
+            return Ok(code);
         }
-        Err(e) => return Err(format_err!("{}", e.render().ansi())),
     };
 
     if self_replace {
