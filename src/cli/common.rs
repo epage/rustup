@@ -471,6 +471,31 @@ pub fn report_error(e: &anyhow::Error, process: &Process) {
     }
 }
 
+pub fn report_cli_error(err: &clap::error::Error, process: &Process) -> Result<ExitCode> {
+    use clap::error::ErrorKind::*;
+
+    if err.kind() == DisplayHelp {
+        write!(process.stdout().lock(), "{}", err.render().ansi())?;
+        Ok(ExitCode::SUCCESS)
+    } else if err.kind() == DisplayVersion {
+        write!(process.stdout().lock(), "{}", err.render().ansi())?;
+        Ok(ExitCode::SUCCESS)
+    } else {
+        if [
+            InvalidSubcommand,
+            UnknownArgument,
+            DisplayHelpOnMissingArgumentOrSubcommand,
+        ]
+        .contains(&err.kind())
+        {
+            write!(process.stdout().lock(), "{}", err.render().ansi())?;
+        } else {
+            write!(process.stderr().lock(), "{}", err.render().ansi())?;
+        }
+        Ok(ExitCode::FAILURE)
+    }
+}
+
 pub(crate) fn ignorable_error(
     error: &'static str,
     no_prompt: bool,

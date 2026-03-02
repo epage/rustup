@@ -25,7 +25,7 @@ use tracing_subscriber::{EnvFilter, Registry, reload::Handle};
 
 use crate::{
     cli::{
-        common::{self, PackageUpdate, update_console_filter},
+        common::{self, PackageUpdate, report_cli_error, update_console_filter},
         errors::CliError,
         help::{
             check_help, completions_help, default_help, doc_help, install_help,
@@ -600,28 +600,12 @@ pub async fn main(
     use clap::error::ErrorKind::*;
     let matches = match Rustup::try_parse_from(process.args_os()) {
         Ok(matches) => matches,
-        Err(err) if err.kind() == DisplayHelp => {
-            write!(process.stdout().lock(), "{}", err.render().ansi())?;
-            return Ok(ExitCode::SUCCESS);
-        }
-        Err(err) if err.kind() == DisplayVersion => {
-            write!(process.stdout().lock(), "{}", err.render().ansi())?;
-            display_version(current_dir, process).await?;
-            return Ok(ExitCode::SUCCESS);
-        }
         Err(err) => {
-            if [
-                InvalidSubcommand,
-                UnknownArgument,
-                DisplayHelpOnMissingArgumentOrSubcommand,
-            ]
-            .contains(&err.kind())
-            {
-                write!(process.stdout().lock(), "{}", err.render().ansi())?;
-            } else {
-                write!(process.stderr().lock(), "{}", err.render().ansi())?;
+            let code = report_cli_error(&err, process)?;
+            if err.kind() == DisplayVersion {
+                display_version(current_dir, process).await?;
             }
-            return Ok(ExitCode::FAILURE);
+            return Ok(code);
         }
     };
 
